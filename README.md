@@ -2,7 +2,7 @@
 
 ## Description
 
-This project is a NestJS-based microservice designed to fetch sports data from external APIs, store it in a database using Prisma ORM, and provide it via RESTful endpoints. The service utilizes Redis for caching, Kafka for messaging, and Swagger for API documentation.
+This project is a NestJS-based microservice designed to fetch sports data from external APIs, store it in a database using Prisma ORM, and provide it via RESTful endpoints. The service utilizes Redis for caching, Kafka for messaging, Unit-Testing for main service, and Swagger for API documentation.
 
 ### Table of Contents
 
@@ -23,6 +23,7 @@ This project is a NestJS-based microservice designed to fetch sports data from e
 - Utilizes Kafka for message-driven architecture
 - Provides interactive API documentation with Swagger
 - Schedules data fetching using cron jobs
+- Unit-tests for the main service
 
 ### Technologies Used
 

@@ -65,14 +65,19 @@ export class DataFetchingService {
 
     if (leagues && leagues.length > 0) {
       await this.prisma.$transaction(async (prisma) => {
+        console.log('Inside transaction - fetching existing leagues');
+
         const existingLeagues = await this.leagueRepository.findLeaguesByExternalIds(
           leagues.map((league: League) => league.externalId),
         );
+
+        console.log('Existing leagues:', existingLeagues);
 
         const newLeagues = leagues.filter(
           (league: League) => !existingLeagues.some((el) => el.externalId === league.externalId),
         );
 
+        console.log('New leagues:', newLeagues);
         if (newLeagues.length > 0) {
           await this.leagueRepository.createLeagues(newLeagues);
           await this.kafkaService.sendMessage('leagues-topic', newLeagues);
