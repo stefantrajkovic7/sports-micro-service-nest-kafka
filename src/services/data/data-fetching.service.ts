@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEFAULT_SPORTS_API_KEY, REDIS_CACHE_TIME } from '../../constants';
+import { DEFAULT_SPORTS_API_KEY, REDIS_CACHE_TIME, SPORTS_BASE_API } from '../../constants';
 import { KafkaService } from '../kafka/kafka.service';
 import { RedisService } from '../redis/redis.service';
 import { TeamRepository } from './../../repositories/team.repository';
@@ -65,19 +65,14 @@ export class DataFetchingService {
 
     if (leagues && leagues.length > 0) {
       await this.prisma.$transaction(async (prisma) => {
-        console.log('Inside transaction - fetching existing leagues');
-
         const existingLeagues = await this.leagueRepository.findLeaguesByExternalIds(
           leagues.map((league: League) => league.externalId),
         );
-
-        console.log('Existing leagues:', existingLeagues);
 
         const newLeagues = leagues.filter(
           (league: League) => !existingLeagues.some((el) => el.externalId === league.externalId),
         );
 
-        console.log('New leagues:', newLeagues);
         if (newLeagues.length > 0) {
           await this.leagueRepository.createLeagues(newLeagues);
           await this.kafkaService.sendMessage('leagues-topic', newLeagues);
@@ -127,7 +122,7 @@ export class DataFetchingService {
 
     const response = await firstValueFrom(
       this.httpService.get<{ leagues: LeagueResponse[] }>(
-        `https://www.thesportsdb.com/api/v1/json/${this.apiKey}/all_leagues.php`
+        `${SPORTS_BASE_API}${this.apiKey}/all_leagues.php`
       )
     );
     if (response.data && response.data.leagues) {
@@ -159,7 +154,7 @@ export class DataFetchingService {
 
     const response = await firstValueFrom(
       this.httpService.get<{ teams: TeamResponse[] }>(
-        `https://www.thesportsdb.com/api/v1/json/${this.apiKey}/search_all_teams.php?l=${leagueName}`
+        `${SPORTS_BASE_API}${this.apiKey}/search_all_teams.php?l=${leagueName}`
       )
     );
     if (response.data && response.data.teams) {

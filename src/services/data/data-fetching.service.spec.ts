@@ -8,7 +8,7 @@ import { RedisService } from '../redis/redis.service';
 import { TeamRepository } from './../../repositories/team.repository';
 import { LeagueRepository } from './../../repositories/league.repository';
 import { DataFetchingService } from './data-fetching.service';
-import { DEFAULT_SPORTS_API_KEY, REDIS_CACHE_TIME } from '../../constants';
+import { REDIS_CACHE_TIME } from '../../constants';
 
 describe('DataFetchingService', () => {
   let service: DataFetchingService;
