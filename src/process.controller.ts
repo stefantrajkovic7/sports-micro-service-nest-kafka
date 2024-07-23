@@ -1,4 +1,4 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { DataFetchingService } from './data-fetching.service';
 import { DataSendingService } from './data-sending.service';
 
@@ -17,6 +17,14 @@ export class ProcessController {
     if (this.isProcessing) {
       this.dataFetchingService.fetchData();
       this.dataSendingService.sendData();
+      return { message: 'Process started' };
+    } else {
+      return { message: 'Process stopped' };
     }
+  }
+
+  @Get('status')
+  getStatus() {
+    return { isProcessing: this.isProcessing };
   }
 }
