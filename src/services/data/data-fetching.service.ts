@@ -4,10 +4,12 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
-import { PrismaService } from './prisma.service';
-import { DEFAULT_SPORTS_API_KEY, REDIS_CACHE_TIME } from './constants';
-import { KafkaService } from './kafka/kafka.service';
-import { RedisService } from './redis/redis.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { DEFAULT_SPORTS_API_KEY, REDIS_CACHE_TIME } from '../../constants';
+import { KafkaService } from '../kafka/kafka.service';
+import { RedisService } from '../redis/redis.service';
+import { TeamRepository } from './../../repositories/team.repository';
+import { LeagueRepository } from './../../repositories/league.repository';
 
 interface LeagueResponse {
   idLeague: string;
@@ -45,10 +47,17 @@ export class DataFetchingService {
     private readonly configService: ConfigService,
     private readonly kafkaService: KafkaService,
     private readonly redisService: RedisService,
+    private readonly leagueRepository: LeagueRepository,
+    private readonly teamRepository: TeamRepository,
   ) {
     this.apiKey = this.configService.get<string>('THESPORTSDB_API_KEY', DEFAULT_SPORTS_API_KEY)
   }
 
+  /**
+   * Scheduled method to fetch data every 5 minutes.
+   * Fetches leagues and teams data from the external sports API,
+   * stores it in the database, and handles updates.
+   */
   @Cron(CronExpression.EVERY_5_MINUTES)
   @ApiOperation({ summary: 'Fetch data from external sports API every 5 minutes' })
   async fetchData() {
@@ -56,18 +65,16 @@ export class DataFetchingService {
 
     if (leagues && leagues.length > 0) {
       await this.prisma.$transaction(async (prisma) => {
-        const existingLeagues = await prisma.league.findMany({
-          where: {
-            externalId: { in: leagues.map((league: League) => league.externalId) },
-          },
-        });
+        const existingLeagues = await this.leagueRepository.findLeaguesByExternalIds(
+          leagues.map((league: League) => league.externalId),
+        );
 
         const newLeagues = leagues.filter(
-          (league: League) => !existingLeagues.some(el => el.externalId === league.externalId)
+          (league: League) => !existingLeagues.some((el) => el.externalId === league.externalId),
         );
 
         if (newLeagues.length > 0) {
-          await prisma.league.createMany({ data: newLeagues });
+          await this.leagueRepository.createLeagues(newLeagues);
           await this.kafkaService.sendMessage('leagues-topic', newLeagues);
         }
       });
@@ -79,40 +86,32 @@ export class DataFetchingService {
 
         if (teams && teams.length > 0) {
           await this.prisma.$transaction(async (prisma) => {
-            const leagueRecord = await prisma.league.findUnique({
-              where: { externalId: league.externalId },
-            });
+            const leagueRecord = await this.leagueRepository.findLeagueByExternalId(
+              league.externalId,
+            );
 
             if (leagueRecord) {
-              const existingTeams = await prisma.team.findMany({
-                where: {
-                  externalId: { in: teams.map((team: Team) => team.externalId) },
-                },
-              });
+              const teamsWithLeagueId = teams.map((team: Team) => ({
+                ...team,
+                leagueId: leagueRecord.id,
+              }));
 
-              const newTeams = teams.filter(
-                (team: Team) => !existingTeams.some(et => et.externalId === team.externalId)
-              );
-
-              if (newTeams.length > 0) {
-                const teamsWithLeagueId = newTeams.map((team: Team) => ({
-                  ...team,
-                  leagueId: leagueRecord.id,
-                }));
-
-                await prisma.team.createMany({ data: teamsWithLeagueId });
-                await this.kafkaService.sendMessage('teams-topic', teamsWithLeagueId);
-              }
+              await this.teamRepository.createTeams(teamsWithLeagueId);
+              await this.kafkaService.sendMessage('teams-topic', teamsWithLeagueId);
             } else {
-              this.logger.error(`League with externalId ${league.externalId} not found.`)
-              throw new Error();
+              throw new Error(`League with externalId ${league.externalId} not found.`);
             }
           });
+          
         }
       }
     }
   }
 
+  /**
+   * Fetch leagues data from the external sports API.
+   * @returns A promise that resolves to an array of league objects.
+   */
   async fetchLeagues() {
     const cacheKey = 'leagues';
     const cachedLeagues = await this.redisService.get(cacheKey);
@@ -139,6 +138,11 @@ export class DataFetchingService {
     return [];
   }
 
+  /**
+   * Fetch teams data for a given league from the external sports API.
+   * @param leagueName - The name of the league to fetch teams for.
+   * @returns A promise that resolves to an array of team objects.
+   */
   async fetchTeams(leagueName: string) {
     const cacheKey = `teams_${leagueName}`;
 

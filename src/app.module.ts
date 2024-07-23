@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { KafkaModule } from './kafka/kafka.module';
-import { RedisModule } from './redis/redis.module';
-import { PrismaService } from './prisma.service';
+import { KafkaModule } from './services/kafka/kafka.module';
+import { RedisModule } from './services/redis/redis.module';
+import { PrismaService } from './services/prisma/prisma.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
-import { DataSendingService } from './data-sending.service';
-import { DataFetchingService } from './data-fetching.service';
-import { ProcessController } from './process.controller';
+import { DataSendingService } from './services/data/data-sending.service';
+import { DataFetchingService } from './services/data/data-fetching.service';
+import { ProcessController } from './controllers/process.controller';
+import { RepositoriesModule } from './repositories/repositories.module';
 
 @Module({
   imports: [
@@ -18,10 +17,10 @@ import { ProcessController } from './process.controller';
     HttpModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
+    RepositoriesModule,
   ],
-  controllers: [AppController, ProcessController],
+  controllers: [ProcessController],
   providers: [
-    AppService, 
     PrismaService, 
     DataSendingService, 
     DataFetchingService
